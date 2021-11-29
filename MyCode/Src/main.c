@@ -3,7 +3,7 @@
 
 /*!
  * Project: STM32F4 GY-906 体温测量
- * Version: 0.0.1
+ * Version: 0.0.2
  */
 
 #pragma clang diagnostic push
@@ -15,7 +15,10 @@ int main() {
 
     printf("\nStart init\n");
 
+    // 定时器 初始化
     Delay_Init();
+    // GY-906 初始化
+    Gy906_Init();
 
     printf("Init Finish\n");
 
