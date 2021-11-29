@@ -15,6 +15,8 @@ int main() {
 
     printf("\nStart init\n");
 
+    Delay_Init();
+
     printf("Init Finish\n");
 
     while (1) {}
