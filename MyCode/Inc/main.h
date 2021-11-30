@@ -8,4 +8,6 @@
 #include "rtc.h"
 #include "oled.h"
 
+void Tim3_Init();
+
 #endif
