@@ -5,5 +5,6 @@
 #include "usart.h"
 #include "delay.h"
 #include "gy906.h"
+#include "rtc.h"
 
 #endif

@@ -3,7 +3,7 @@
 
 /*!
  * Project: STM32F4 GY-906 体温测量
- * Version: 0.0.2
+ * Version: 0.0.3
  */
 
 #pragma clang diagnostic push
@@ -19,10 +19,13 @@ int main() {
     Delay_Init();
     // GY-906 初始化
     Gy906_Init();
+    // RTC 初始化
+    Rtc_Init();
 
     printf("Init Finish\n");
 
-    while (1) {}
+    while (1) {
+    }
 }
 
 #pragma clang diagnostic pop
