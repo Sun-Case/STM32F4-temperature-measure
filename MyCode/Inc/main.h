@@ -11,4 +11,6 @@
 
 void Tim3_Init();
 
+void Tim4_Init();
+
 #endif

@@ -11,6 +11,7 @@
 #pragma ide diagnostic ignored "EndlessLoop"
 
 int main() {
+    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
     // 重定向 printf
     printf_redirect();
 
@@ -27,9 +28,13 @@ int main() {
     Oled_Fill(0x00);
     // 初始化 TIM3 定时器，显示时间
     Tim3_Init();
+    // 初始化 TIm4 定时器，配置中断
+    Tim4_Init();
     // 按钮初始化，并开启中断
     Key_Init(KEY_0);
-    Key_NVIC_Init(KEY_0, EXTI_Trigger_Rising, 1, 0);
+    Key_NVIC_Init(KEY_0, EXTI_Trigger_Rising, 1, 2);
+    Key_Init(KEY_1);
+    Key_NVIC_Init(KEY_1, EXTI_Trigger_Rising, 1, 3);
 
     printf("Init Finish\n");
 
@@ -39,12 +44,35 @@ int main() {
 
 #pragma clang diagnostic pop
 
+void Tim4_Init() {
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM4, ENABLE);
+
+    TIM_TimeBaseInitTypeDef TIM_TimBaseStruct = {
+            .TIM_Prescaler=8400 - 1,
+            .TIM_Period=10000 - 1,
+            .TIM_CounterMode=TIM_CounterMode_Up,
+            .TIM_ClockDivision=TIM_CKD_DIV1,
+    };
+    TIM_TimeBaseInit(TIM4, &TIM_TimBaseStruct);
+
+    NVIC_InitTypeDef NVIC_InitStruct = {
+            .NVIC_IRQChannel=TIM4_IRQn,
+            .NVIC_IRQChannelCmd=ENABLE,
+            .NVIC_IRQChannelPreemptionPriority=1,
+            .NVIC_IRQChannelSubPriority=1,
+    };
+    NVIC_Init(&NVIC_InitStruct);
+
+    TIM_ITConfig(TIM4, TIM_IT_Update, DISABLE);
+    TIM_Cmd(TIM4, DISABLE);
+}
+
 void Tim3_Init() {
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);
 
     TIM_TimeBaseInitTypeDef TIM_TimBaseStruct = {
-            .TIM_Prescaler=84 - 1,
-            .TIM_Period=1000 - 1,
+            .TIM_Prescaler=8400 - 1,
+            .TIM_Period=10000 - 1,
             .TIM_CounterMode=TIM_CounterMode_Up,
             .TIM_ClockDivision=TIM_CKD_DIV1,
     };
@@ -53,7 +81,7 @@ void Tim3_Init() {
     NVIC_InitTypeDef NVIC_InitStruct = {
             .NVIC_IRQChannel=TIM3_IRQn,
             .NVIC_IRQChannelCmd=ENABLE,
-            .NVIC_IRQChannelPreemptionPriority=0,
+            .NVIC_IRQChannelPreemptionPriority=1,
             .NVIC_IRQChannelSubPriority=0
     };
     NVIC_Init(&NVIC_InitStruct);
@@ -61,6 +89,41 @@ void Tim3_Init() {
     TIM_ITConfig(TIM3, TIM_IT_Update, ENABLE);
 
     TIM_Cmd(TIM3, ENABLE);
+}
+
+__attribute__((unused)) void TIM4_IRQHandler() {
+    if (TIM_GetITStatus(TIM3, TIM_IT_Update) == SET) {
+        u8 buf[3] = {0};
+        Gy906_Read(0x07, buf, 3);
+        float T = ((float) *(u16 *) buf) * 0.02 - 273.15; // NOLINT(cppcoreguidelines-narrowing-conversions)
+
+        Oled_ShowTemperature_24x48(T);
+
+        TIM_ClearITPendingBit(TIM4, TIM_IT_Update);
+    }
+}
+
+__attribute__((unused)) void EXTI2_IRQHandler() {
+    static int state = 0;
+
+    if (EXTI_GetITStatus(EXTI_Line2) == SET) {
+        for (volatile int i = 0; i < 100; i++) {
+            for (volatile int j = 0; j < 100; j++) {}
+        }
+
+        if (PEin(2)) {
+            if (state) {
+                TIM_ITConfig(TIM4, TIM_IT_Update, DISABLE);
+                TIM_Cmd(TIM4, DISABLE);
+            } else {
+                TIM_ITConfig(TIM4, TIM_IT_Update, ENABLE);
+                TIM_Cmd(TIM4, ENABLE);
+            }
+            state = !state;
+        }
+
+        EXTI_ClearITPendingBit(EXTI_Line2);
+    }
 }
 
 __attribute__((unused)) void EXTI0_IRQHandler() {

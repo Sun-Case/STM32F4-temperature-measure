@@ -342,7 +342,7 @@ void Oled_Show_24x48(u8 x, u8 y, char ch[]) {
             y += 6;
         }
 
-        for (int i = 0; i < 8; i++) {
+        for (int i = 0; i < 5; i++) {
             Oled_SetPos(x, y + i);
             for (int j = 0; j < 24; j++) {
                 WriteDat(Number_28x56[index][i][j]);
@@ -359,7 +359,7 @@ void Oled_Show_24x48(u8 x, u8 y, char ch[]) {
 
 void Oled_ShowTemperature_24x48(float T) {
     // 清屏
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 6; i++) {
         Oled_SetPos(0, 1 + i);
         for (int j = 0; j < 128; j++) {
             WriteDat(0x00);
