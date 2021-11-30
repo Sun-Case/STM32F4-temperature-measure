@@ -21,6 +21,8 @@ int main() {
     Gy906_Init();
     // RTC 初始化
     Rtc_Init();
+    // OLed 初始化
+    Oled_Init();
 
     printf("Init Finish\n");
 
