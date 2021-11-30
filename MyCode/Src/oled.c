@@ -358,7 +358,15 @@ void Oled_Show_24x48(u8 x, u8 y, char ch[]) {
 }
 
 void Oled_ShowTemperature_24x48(float T) {
-    if (T < 30) {
+    // 清屏
+    for (int i = 0; i < 8; i++) {
+        Oled_SetPos(0, 1 + i);
+        for (int j = 0; j < 128; j++) {
+            WriteDat(0x00);
+        }
+    }
+
+    if (T < 25) {
         // Too Low
         Oled_Show_24x48(40, 1, "Lo");
     } else if (T > 45) {
@@ -368,7 +376,6 @@ void Oled_ShowTemperature_24x48(float T) {
         // 格式化为 XX.XX ℃
         char buf[6] = {0};
         sprintf(buf, "%5.1f", T);
-        printf("%s\n", buf);
         Oled_Show_24x48(14, 1, buf);
 
         for (int i = 0; i < 2; i++) {

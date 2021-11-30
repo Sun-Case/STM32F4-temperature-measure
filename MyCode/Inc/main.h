@@ -7,6 +7,7 @@
 #include "gy906.h"
 #include "rtc.h"
 #include "oled.h"
+#include "key.h"
 
 void Tim3_Init();
 

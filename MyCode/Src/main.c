@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include "sys.h"
 #include "main.h"
 
 /*!
@@ -26,6 +27,9 @@ int main() {
     Oled_Fill(0x00);
     // 初始化 TIM3 定时器，显示时间
     Tim3_Init();
+    // 按钮初始化，并开启中断
+    Key_Init(KEY_0);
+    Key_NVIC_Init(KEY_0, EXTI_Trigger_Rising, 1, 0);
 
     printf("Init Finish\n");
 
@@ -57,6 +61,24 @@ void Tim3_Init() {
     TIM_ITConfig(TIM3, TIM_IT_Update, ENABLE);
 
     TIM_Cmd(TIM3, ENABLE);
+}
+
+__attribute__((unused)) void EXTI0_IRQHandler() {
+    if (EXTI_GetITStatus(EXTI_Line0) == SET) {
+        for (volatile int i = 0; i < 100; i++) {
+            for (volatile int j = 0; j < 100; j++) {}
+        }
+        if (PAin(0)) {
+            u8 buf[3] = {0};
+            Gy906_Read(0x07, buf, 3);
+            float T = ((float) *(u16 *) buf) * 0.02 - 273.15; // NOLINT(cppcoreguidelines-narrowing-conversions)
+
+            Oled_ShowTemperature_24x48(T);
+
+            printf("Temperature: %.2f\n", T);
+        }
+        EXTI_ClearITPendingBit(EXTI_Line0);
+    }
 }
 
 __attribute__((unused)) void TIM3_IRQHandler() {
