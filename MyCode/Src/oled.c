@@ -366,10 +366,10 @@ void Oled_ShowTemperature_24x48(float T) {
         }
     }
 
-    if (T < 25) {
+    if (T < 20) {
         // Too Low
         Oled_Show_24x48(40, 1, "Lo");
-    } else if (T > 45) {
+    } else if (T > 50) {
         // Too High
         Oled_Show_24x48(52, 1, "H");
     } else {
