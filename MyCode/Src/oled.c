@@ -387,4 +387,11 @@ void Oled_ShowTemperature_24x48(float T) {
     }
 }
 
+void Oled_ShowEnvRHTA(u8 rh, u8 ta) {
+    char buf[255] = {0};
+    sprintf(buf, "RH: %d%% | TA: %d `C", rh, ta);
+    Oled_ShowAscii(0, 7, buf, s6x8);
+    printf("%s\n", buf);
+}
+
 #undef delay_us

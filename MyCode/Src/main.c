@@ -129,9 +129,7 @@ __attribute__((unused)) void TIM2_IRQHandler() {
                 buf[i] = Dht11_Read_Byte();
             }
 
-            char content[255] = {0};
-            sprintf(content, "RH: %d%% | TA: %d", buf[0], buf[2]);
-            printf("%s\n", content);
+            Oled_ShowEnvRHTA(buf[0], buf[2]);
         }
         TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
     }
