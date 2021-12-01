@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include "sys.h"
 #include "main.h"
 
@@ -35,6 +36,9 @@ int main() {
     Key_NVIC_Init(KEY_0, EXTI_Trigger_Rising, 1, 2);
     Key_Init(KEY_1);
     Key_NVIC_Init(KEY_1, EXTI_Trigger_Rising, 1, 3);
+    // 初始化 DHT11
+    Dht11_Init();
+    Tim2_Init();
 
     printf("Init Finish\n");
 
@@ -44,12 +48,35 @@ int main() {
 
 #pragma clang diagnostic pop
 
+void Tim2_Init() {
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
+
+    TIM_TimeBaseInitTypeDef TIM_TimBaseStruct = {
+            .TIM_Prescaler=8400 - 1,
+            .TIM_Period=20000 - 1,
+            .TIM_CounterMode=TIM_CounterMode_Up,
+            .TIM_ClockDivision=TIM_CKD_DIV1,
+    };
+    TIM_TimeBaseInit(TIM2, &TIM_TimBaseStruct);
+
+    NVIC_InitTypeDef NVIC_InitStruct = {
+            .NVIC_IRQChannel=TIM2_IRQn,
+            .NVIC_IRQChannelCmd=ENABLE,
+            .NVIC_IRQChannelPreemptionPriority=1,
+            .NVIC_IRQChannelSubPriority=3,
+    };
+    NVIC_Init(&NVIC_InitStruct);
+
+    TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);
+    TIM_Cmd(TIM2, ENABLE);
+}
+
 void Tim4_Init() {
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM4, ENABLE);
 
     TIM_TimeBaseInitTypeDef TIM_TimBaseStruct = {
             .TIM_Prescaler=8400 - 1,
-            .TIM_Period=10000 - 1,
+            .TIM_Period=5000 - 1,
             .TIM_CounterMode=TIM_CounterMode_Up,
             .TIM_ClockDivision=TIM_CKD_DIV1,
     };
@@ -59,7 +86,7 @@ void Tim4_Init() {
             .NVIC_IRQChannel=TIM4_IRQn,
             .NVIC_IRQChannelCmd=ENABLE,
             .NVIC_IRQChannelPreemptionPriority=1,
-            .NVIC_IRQChannelSubPriority=1,
+            .NVIC_IRQChannelSubPriority=0,
     };
     NVIC_Init(&NVIC_InitStruct);
 
@@ -82,13 +109,32 @@ void Tim3_Init() {
             .NVIC_IRQChannel=TIM3_IRQn,
             .NVIC_IRQChannelCmd=ENABLE,
             .NVIC_IRQChannelPreemptionPriority=1,
-            .NVIC_IRQChannelSubPriority=0
+            .NVIC_IRQChannelSubPriority=1,
     };
     NVIC_Init(&NVIC_InitStruct);
 
     TIM_ITConfig(TIM3, TIM_IT_Update, ENABLE);
 
     TIM_Cmd(TIM3, ENABLE);
+}
+
+__attribute__((unused)) void TIM2_IRQHandler() {
+    if (TIM_GetITStatus(TIM2, TIM_IT_Update) == SET) {
+        int ret = Dht11_Start();
+        if (ret != 0) {
+            printf("Start Dht11 Failure: %d\n", ret);
+        } else {
+            u8 buf[5] = {0};
+            for (int i = 0; i < 5; i++) {
+                buf[i] = Dht11_Read_Byte();
+            }
+
+            char content[255] = {0};
+            sprintf(content, "RH: %d%% | TA: %d", buf[0], buf[2]);
+            printf("%s\n", content);
+        }
+        TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
+    }
 }
 
 __attribute__((unused)) void TIM4_IRQHandler() {

@@ -8,9 +8,12 @@
 #include "rtc.h"
 #include "oled.h"
 #include "key.h"
+#include "dht11.h"
 
 void Tim3_Init();
 
 void Tim4_Init();
+
+void Tim2_Init();
 
 #endif
