@@ -98,6 +98,7 @@ __attribute__((unused)) void TIM4_IRQHandler() {
         float T = ((float) *(u16 *) buf) * 0.02 - 273.15; // NOLINT(cppcoreguidelines-narrowing-conversions)
 
         Oled_ShowTemperature_24x48(T);
+        printf("Auto temperature: %.2f\n", T);
 
         TIM_ClearITPendingBit(TIM4, TIM_IT_Update);
     }
