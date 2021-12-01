@@ -9,11 +9,16 @@
 #include "oled.h"
 #include "key.h"
 #include "dht11.h"
+#include "esp8266.h"
 
 void Tim3_Init();
 
 void Tim4_Init();
 
 void Tim2_Init();
+
+void Esp8266_Init();
+
+void Tim5_Init();
 
 #endif

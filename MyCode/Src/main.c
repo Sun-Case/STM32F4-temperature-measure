@@ -29,7 +29,7 @@ int main() {
     Oled_Fill(0x00);
     // 初始化 TIM3 定时器，显示时间
     Tim3_Init();
-    // 初始化 TIm4 定时器，配置中断
+    // 初始化 Tim4 定时器，配置中断
     Tim4_Init();
     // 按钮初始化，并开启中断
     Key_Init(KEY_0);
@@ -39,6 +39,8 @@ int main() {
     // 初始化 DHT11
     Dht11_Init();
     Tim2_Init();
+    // 初始化 Tim5 定时器，定时启动 ESP8266，获取时间
+    Tim5_Init();
 
     printf("Init Finish\n");
 
@@ -47,6 +49,84 @@ int main() {
 }
 
 #pragma clang diagnostic pop
+
+void Esp8266_Init() {
+    Init:
+    esp8266_init();
+
+    int rt = esp8266_exit_transparent_transmission();
+    if (rt) {
+        printf("esp8266_exit_transparent_transmission fail\n");
+        goto Init;
+    }
+    printf("esp8266_exit_transparent_transmission success\n");
+    Delay_s(1);
+
+    rt = esp8266_reset();
+    if (rt) {
+        printf("esp8266_reset fail\n");
+        goto Init;
+    }
+    printf("esp8266_reset success\n");
+    Delay_s(1);
+
+    rt = esp8266_enable_echo(0);
+    if (rt) {
+        printf("esp8266_enable_echo(0) fail\n");
+        goto Init;
+    }
+    printf("esp8266_enable_echo(0) success\n");
+    Delay_s(1);
+
+    rt = esp8266_connect_ap(WIFI_SSID, WIFI_PASSWORD);
+    if (rt) {
+        printf("esp8266_connect_ap fail\n");
+        goto Init;
+    }
+    printf("esp8266_connect_ap success\n");
+    Delay_s(1);
+
+    rt = esp8266_connect_server("TCP", "192.168.5.132", 10086);
+    if (rt) {
+        printf("esp8266_connect_server fail\n");
+        goto Init;
+    }
+    printf("esp8266_connect_server success\n");
+    Delay_s(1);
+
+    rt = esp8266_entry_transparent_transmission();
+    if (rt) {
+        printf("esp8266_entry_transparent_transmission fail\n");
+        goto Init;
+    }
+    printf("esp8266_entry_transparent_transmission success\n");
+    Delay_s(1);
+    g_esp8266_rx_cnt = 0;
+    g_esp8266_rx_end = 0;
+}
+
+void Tim5_Init() {
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM5, ENABLE);
+
+    TIM_TimeBaseInitTypeDef TIM_TimeBaseStruct = {
+            .TIM_Prescaler=8400 - 1,
+            .TIM_Period=10000 - 1,
+            .TIM_CounterMode=TIM_CounterMode_Up,
+            .TIM_ClockDivision=TIM_CKD_DIV1,
+    };
+    TIM_TimeBaseInit(TIM5, &TIM_TimeBaseStruct);
+
+    NVIC_InitTypeDef NVIC_InitStruct = {
+            .NVIC_IRQChannel=TIM5_IRQn,
+            .NVIC_IRQChannelCmd=ENABLE,
+            .NVIC_IRQChannelPreemptionPriority=2,
+            .NVIC_IRQChannelSubPriority=0,
+    };
+    NVIC_Init(&NVIC_InitStruct);
+
+    TIM_ITConfig(TIM5, TIM_IT_Update, ENABLE);
+    TIM_Cmd(TIM5, ENABLE);
+}
 
 void Tim2_Init() {
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
@@ -116,6 +196,25 @@ void Tim3_Init() {
     TIM_ITConfig(TIM3, TIM_IT_Update, ENABLE);
 
     TIM_Cmd(TIM3, ENABLE);
+}
+
+__attribute__((unused)) void TIM5_IRQHandler() {
+    if (TIM_GetITStatus(TIM5, TIM_IT_Update) == SET) {
+        static int count = 0;
+
+
+        if (count == 60) {
+            count = 0;
+            TIM_ClearITPendingBit(TIM5, TIM_IT_Update);
+            Esp8266_Init();
+            u8 t;
+            esp8266_send_bytes(&t, 1);
+        } else {
+            count++;
+            TIM_ClearITPendingBit(TIM5, TIM_IT_Update);
+        }
+
+    }
 }
 
 __attribute__((unused)) void TIM2_IRQHandler() {
