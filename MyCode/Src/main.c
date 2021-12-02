@@ -5,8 +5,12 @@
 
 /*!
  * Project: STM32F4 GY-906 体温测量
- * Version: 0.0.3
+ *
+ * 温度保存在 W25Q128 的 0x010000 处，以二进制数据保存 TemperatureData 结构体
  */
+
+#define SAVE_ADDRESS 0x010000
+TemperatureData TD;
 
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "EndlessLoop"
@@ -41,14 +45,84 @@ int main() {
     Tim2_Init();
     // 初始化 Tim5 定时器，定时启动 ESP8266，获取时间
     Tim5_Init();
+    // 初始化 SPI，用于与 Flash 通信
+    Spi_Init();
 
     printf("Init Finish\n");
+
+    // w25q128 设备ID
+    printf("w25q128 ID: %#X\n", W25q128_Id());
+    // 读取保存的数据
+    W25q128_Read(SAVE_ADDRESS, (u8 *) &TD, sizeof(TD));
+    if (Check() == 0) {
+        TD.count = TD.offset = 0;
+        printf("Null Data or Block Data, Over Write\n");
+        bzero((u8 *) &TD, sizeof(TD));
+    } else {
+        printf("Count: %d, Offset: %d\n", TD.count, TD.offset);
+    }
+    Save_Data();
 
     while (1) {
     }
 }
 
 #pragma clang diagnostic pop
+
+int Check() {
+    if (TD.count > 32 || TD.offset > 32) {
+        return 0;
+    }
+
+    if (TD.check != Build_Hash()) {
+        return 0;
+    }
+    return 1;
+}
+
+// 一个校验算法，灵感来源于 simhash
+u8 Build_Hash() {
+    u8 list[8] = {0};
+
+    for (int i = 0; i < 8; i++) {
+        if ((TD.count & (0x01 << i))) {
+            list[i]++;
+        } else {
+            list[i]--;
+        }
+        if ((TD.offset & (0x01 << i))) {
+            list[i]++;
+        } else {
+            list[i]--;
+        }
+    }
+
+    for (int i = 0; i < 32; i++) {
+        for (int j = 0; j < 8; j++) {
+            if (TD.T[i] & (0x01 << j)) {
+                list[j]++;
+            } else {
+                list[j]--;
+            }
+        }
+    }
+
+    u8 hash = 0x00;
+    for (int i = 0; i < 8; i++) {
+        if (list[i] > 0) {
+            hash |= (0x01 << i);
+        }
+    }
+
+    return hash;
+}
+
+// 覆写数据
+void Save_Data() {
+    TD.check = Build_Hash();
+    W25q128_SectorErase(SAVE_ADDRESS);
+    W25q128_Write(SAVE_ADDRESS, (u8 *) &TD, sizeof(TD));
+}
 
 void Esp8266_Init() {
     Init:
