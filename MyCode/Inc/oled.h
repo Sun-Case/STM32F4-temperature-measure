@@ -18,7 +18,7 @@ void Oled_OFF(void);
 
 void Oled_ShowAscii(u8 x, u8 y, char ascii[], FontSize fs);
 
-void Oled_ShowTemperature_24x48(float T);
+void Oled_ShowTemperature_24x48(float T, int index, int count);
 
 void Oled_ShowEnvRHTA(u8 rh, u8 ta);
 

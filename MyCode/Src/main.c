@@ -13,6 +13,8 @@
 
 #define SAVE_ADDRESS 0x010000
 TemperatureData TD;
+int offset = 0;
+int showed = 0;
 
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "EndlessLoop"
@@ -49,6 +51,11 @@ int main() {
     Tim5_Init();
     // 初始化 SPI，用于与 Flash 通信
     Spi_Init();
+    // 按钮初始化，并开启中断，用于切换显示温度
+    Key_Init(KEY_2);
+    Key_NVIC_Init(KEY_2, EXTI_Trigger_Rising, 1, 0);
+    Key_Init(KEY_3);
+    Key_NVIC_Init(KEY_3, EXTI_Trigger_Rising, 1, 0);
 
     printf("Init Finish\n");
 
@@ -57,11 +64,11 @@ int main() {
     // 读取保存的数据
     W25q128_Read(SAVE_ADDRESS, (u8 *) &TD, sizeof(TD));
     if (Check() == 0) {
-        TD.count = TD.offset = 0;
+        TD.count = 0;
         printf("Null Data or Block Data, Over Write\n");
         bzero((u8 *) &TD, sizeof(TD));
     } else {
-        printf("Count: %lu, Offset: %lu\n", TD.count, TD.offset);
+        printf("Count: %lu\n", TD.count);
     }
     Save_Data();
     Show_Temperature();
@@ -77,29 +84,22 @@ void Show_Temperature() {
         return;
     }
     for (int i = 0; i < TD.count; i++) {
-        if (i > TD.offset) {
-            printf("No. %d, T: %.2f\n", i + 1, TD.T[32 + ((int32_t) TD.offset) - i]);
-        } else {
-            printf("No. %d, T: %.2f\n", i + 1, TD.T[((int32_t) TD.offset) - i - 1]);
-        }
+        printf("No.%2.2lu, T: %.2f\n", TD.count - i, TD.T[TD.count - i - 1]);
     }
 }
 
 void Add_Temperature(float t) {
-    u8 *u8_t = (u8 *) &t;
-    memcpy((u8 *) &(TD.T[TD.offset]), u8_t, sizeof(u32));
-    if (TD.offset == 31) {
-        TD.offset = 0;
+    if (TD.count == 32) {
+        memcpy((u8 *) &(TD.T[0]), (u8 *) &(TD.T[1]), sizeof(float) * 31);
+        TD.T[31] = t;
     } else {
-        TD.offset++;
+        TD.T[TD.count++] = t;
     }
-    if (TD.count < 32) {
-        TD.count++;
-    }
+    Save_Data();
 }
 
 int Check() {
-    if (TD.count > 32 || TD.offset > 32) {
+    if (TD.count > 32) {
         return 0;
     }
 
@@ -115,11 +115,6 @@ u32 Build_Hash() {
 
     for (int i = 0; i < 8; i++) {
         if ((TD.count & (0x00000001 << i))) {
-            list[i]++;
-        } else {
-            list[i]--;
-        }
-        if ((TD.offset & (0x00000001 << i))) {
             list[i]++;
         } else {
             list[i]--;
@@ -301,6 +296,58 @@ void Tim3_Init() {
     TIM_Cmd(TIM3, ENABLE);
 }
 
+__attribute__((unused)) void EXTI4_IRQHandler() {
+    if (EXTI_GetITStatus(EXTI_Line4) == SET) {
+        for (volatile int i = 0; i < 100; i++) {
+            for (volatile int j = 0; j < 100; j++) {}
+        }
+
+        if (PEin(3) && TD.count != 0) {
+            // 下一条温度记录
+            if (offset < 0) {
+                offset = (int) TD.count + offset + 3;
+            }
+            if (showed == 0) {
+                offset = (int) TD.count;
+                showed = 1;
+            } else if (offset - (int) TD.count == 1 || offset == 0) {
+                offset = 1;
+            }
+            Oled_ShowTemperature_24x48(TD.T[offset - 1], offset, (int) TD.count);
+            offset++;
+        }
+
+        EXTI_ClearITPendingBit(EXTI_Line4);
+    }
+}
+
+__attribute__((unused)) void EXTI3_IRQHandler() {
+    if (EXTI_GetITStatus(EXTI_Line3) == SET) {
+        for (volatile int i = 0; i < 100; i++) {
+            for (volatile int j = 0; j < 100; j++) {}
+        }
+
+        if (PEin(3) && TD.count != 0) {
+            if (offset > 0) {
+                offset = offset - (int) TD.count - 3;
+            }
+            if (showed == 0) {
+                offset = -2;
+                showed = 1;
+            } else if (offset + (int) TD.count == -1) {
+                offset = -1;
+            } else if (offset == 0) {
+                offset = -2;
+            }
+            // 上一条温度记录
+            Oled_ShowTemperature_24x48(TD.T[TD.count + offset], (int) TD.count + offset + 1, (int) TD.count);
+            offset--;
+        }
+
+        EXTI_ClearITPendingBit(EXTI_Line3);
+    }
+}
+
 __attribute__((unused)) void TIM5_IRQHandler() {
     if (TIM_GetITStatus(TIM5, TIM_IT_Update) == SET) {
         static int count = 0;
@@ -343,10 +390,11 @@ __attribute__((unused)) void TIM4_IRQHandler() {
         Gy906_Read(0x07, buf, 3);
         float T = ((float) *(u16 *) buf) * 0.02 - 273.15; // NOLINT(cppcoreguidelines-narrowing-conversions)
 
-        Oled_ShowTemperature_24x48(T);
+        Oled_ShowTemperature_24x48(T, (int) TD.count, (int) TD.count);
         printf("Auto temperature: %.2f\n", T);
 
         TIM_ClearITPendingBit(TIM4, TIM_IT_Update);
+        offset = 0;
     }
 }
 
@@ -383,12 +431,13 @@ __attribute__((unused)) void EXTI0_IRQHandler() {
             Gy906_Read(0x07, buf, 3);
             float T = ((float) *(u16 *) buf) * 0.02 - 273.15; // NOLINT(cppcoreguidelines-narrowing-conversions)
 
-            Oled_ShowTemperature_24x48(T);
-
             printf("Temperature: %.2f\n", T);
 
             Add_Temperature(T);
             Save_Data();
+            offset = 0;
+
+            Oled_ShowTemperature_24x48(T, (int) TD.count, (int) TD.count);
         }
         EXTI_ClearITPendingBit(EXTI_Line0);
     }

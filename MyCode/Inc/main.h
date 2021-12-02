@@ -26,7 +26,6 @@ void Tim5_Init();
 typedef struct {
     u32 check;
     u32 count;
-    u32 offset;
     float T[32];
 } TemperatureData;
 

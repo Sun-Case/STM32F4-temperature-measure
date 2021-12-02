@@ -357,7 +357,7 @@ void Oled_Show_24x48(u8 x, u8 y, char ch[]) {
     }
 }
 
-void Oled_ShowTemperature_24x48(float T) {
+void Oled_ShowTemperature_24x48(float T, int index, int count) {
     // 清屏
     for (int i = 0; i < 6; i++) {
         Oled_SetPos(0, 1 + i);
@@ -376,14 +376,18 @@ void Oled_ShowTemperature_24x48(float T) {
         // 格式化为 XX.XX ℃
         char buf[6] = {0};
         sprintf(buf, "%5.1f", T);
-        Oled_Show_24x48(14, 1, buf);
+        Oled_Show_24x48(0, 1, buf);
 
         for (int i = 0; i < 2; i++) {
-            Oled_SetPos(100, 4 + i);
+            Oled_SetPos(100 - 14, 4 + i);
             for (int j = 0; j < 16; j++) {
                 WriteDat(unit[i][j]);
             }
         }
+
+        char n[6] = {0};
+        sprintf(n, "%d/%d", index, count);
+        Oled_ShowAscii((index < 10) ? (100 - 14 + 8) : (100 - 14), 2, n, s6x8);
     }
 }
 
@@ -391,7 +395,7 @@ void Oled_ShowEnvRHTA(u8 rh, u8 ta) {
     char buf[255] = {0};
     sprintf(buf, "RH: %d%% | TA: %d `C", rh, ta);
     Oled_ShowAscii(0, 7, buf, s6x8);
-    printf("%s\n", buf);
+//    printf("%s\n", buf);
 }
 
 #undef delay_us
