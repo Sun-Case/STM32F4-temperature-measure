@@ -7,6 +7,8 @@
  * Project: STM32F4 GY-906 体温测量
  *
  * 温度保存在 W25Q128 的 0x010000 处，以二进制数据保存 TemperatureData 结构体
+ *
+ * 为了方便处理数据， TD.T 当成一个 环形数组， TD.offset 记录了 起始位置, TD.count 记录数据数量
  */
 
 #define SAVE_ADDRESS 0x010000
@@ -59,15 +61,42 @@ int main() {
         printf("Null Data or Block Data, Over Write\n");
         bzero((u8 *) &TD, sizeof(TD));
     } else {
-        printf("Count: %d, Offset: %d\n", TD.count, TD.offset);
+        printf("Count: %lu, Offset: %lu\n", TD.count, TD.offset);
     }
     Save_Data();
+    Show_Temperature();
 
     while (1) {
     }
 }
 
 #pragma clang diagnostic pop
+
+void Show_Temperature() {
+    if (TD.count == 0) {
+        return;
+    }
+    for (int i = 0; i < TD.count; i++) {
+        if (i > TD.offset) {
+            printf("No. %d, T: %.2f\n", i + 1, TD.T[32 + ((int32_t) TD.offset) - i]);
+        } else {
+            printf("No. %d, T: %.2f\n", i + 1, TD.T[((int32_t) TD.offset) - i - 1]);
+        }
+    }
+}
+
+void Add_Temperature(float t) {
+    u8 *u8_t = (u8 *) &t;
+    memcpy((u8 *) &(TD.T[TD.offset]), u8_t, sizeof(u32));
+    if (TD.offset == 31) {
+        TD.offset = 0;
+    } else {
+        TD.offset++;
+    }
+    if (TD.count < 32) {
+        TD.count++;
+    }
+}
 
 int Check() {
     if (TD.count > 32 || TD.offset > 32) {
@@ -81,16 +110,16 @@ int Check() {
 }
 
 // 一个校验算法，灵感来源于 simhash
-u8 Build_Hash() {
-    u8 list[8] = {0};
+u32 Build_Hash() {
+    u8 list[32] = {0};
 
     for (int i = 0; i < 8; i++) {
-        if ((TD.count & (0x01 << i))) {
+        if ((TD.count & (0x00000001 << i))) {
             list[i]++;
         } else {
             list[i]--;
         }
-        if ((TD.offset & (0x01 << i))) {
+        if ((TD.offset & (0x00000001 << i))) {
             list[i]++;
         } else {
             list[i]--;
@@ -99,7 +128,7 @@ u8 Build_Hash() {
 
     for (int i = 0; i < 32; i++) {
         for (int j = 0; j < 8; j++) {
-            if (TD.T[i] & (0x01 << j)) {
+            if ((*(u32 *) &(TD.T[i])) & (0x00000001 << j)) {
                 list[j]++;
             } else {
                 list[j]--;
@@ -107,10 +136,10 @@ u8 Build_Hash() {
         }
     }
 
-    u8 hash = 0x00;
-    for (int i = 0; i < 8; i++) {
+    u32 hash = 0x00000000;
+    for (int i = 0; i < sizeof(list); i++) {
         if (list[i] > 0) {
-            hash |= (0x01 << i);
+            hash |= (0x00000001 << i);
         }
     }
 
@@ -357,6 +386,9 @@ __attribute__((unused)) void EXTI0_IRQHandler() {
             Oled_ShowTemperature_24x48(T);
 
             printf("Temperature: %.2f\n", T);
+
+            Add_Temperature(T);
+            Save_Data();
         }
         EXTI_ClearITPendingBit(EXTI_Line0);
     }

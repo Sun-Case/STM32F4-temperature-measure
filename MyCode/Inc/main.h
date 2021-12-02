@@ -24,15 +24,19 @@ void Esp8266_Init();
 void Tim5_Init();
 
 typedef struct {
-    u8 check;
-    u8 count;
-    u8 offset;
-    u8 T[32];
+    u32 check;
+    u32 count;
+    u32 offset;
+    float T[32];
 } TemperatureData;
+
+void Show_Temperature();
+
+void Add_Temperature(float t);
 
 void Save_Data();
 
-u8 Build_Hash();
+u32 Build_Hash();
 
 int Check();
 
