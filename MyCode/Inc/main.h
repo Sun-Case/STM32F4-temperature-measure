@@ -12,6 +12,9 @@
 #include "esp8266.h"
 #include "spi.h"
 #include "w25q128.h"
+#include "beep.h"
+
+void Tim1_Init();
 
 void Tim3_Init();
 

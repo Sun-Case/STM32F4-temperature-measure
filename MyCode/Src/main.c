@@ -56,6 +56,9 @@ int main() {
     Key_NVIC_Init(KEY_2, EXTI_Trigger_Rising, 1, 0);
     Key_Init(KEY_3);
     Key_NVIC_Init(KEY_3, EXTI_Trigger_Rising, 1, 0);
+    // 蜂鸣器报警
+    Beep_Init();
+    Tim1_Init();
 
     printf("Init Finish\n");
 
@@ -86,6 +89,8 @@ void Sleep() {
     TIM_Cmd(TIM4, DISABLE);
     // 关闭 TIM5 (定时校准时间)
     TIM_Cmd(TIM5, DISABLE);
+    // 关闭 TIM1 (蜂鸣器)
+    TIM_Cmd(TIM1, DISABLE);
     // 关闭 OLED
     Oled_OFF();
 }
@@ -164,6 +169,30 @@ void Save_Data() {
     TD.check = Build_Hash();
     W25q128_SectorErase(SAVE_ADDRESS);
     W25q128_Write(SAVE_ADDRESS, (u8 *) &TD, sizeof(TD));
+}
+
+void Tim1_Init() {
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM1, ENABLE);
+
+    TIM_TimeBaseInitTypeDef TIM_TimeBaseStruct = {
+            .TIM_Prescaler=168 - 1,
+            .TIM_Period=1000 - 1,
+            .TIM_CounterMode=TIM_CounterMode_Up,
+            .TIM_ClockDivision=TIM_CKD_DIV1,
+    };
+    TIM_TimeBaseInit(TIM1, &TIM_TimeBaseStruct);
+
+    NVIC_InitTypeDef NVIC_InitStruct = {
+            .NVIC_IRQChannel=TIM1_UP_TIM10_IRQn,
+            .NVIC_IRQChannelPreemptionPriority=2,
+            .NVIC_IRQChannelSubPriority=1,
+            .NVIC_IRQChannelCmd=ENABLE,
+    };
+    NVIC_Init(&NVIC_InitStruct);
+
+    TIM_Cmd(TIM1, DISABLE);
+    TIM_ClearITPendingBit(TIM1, TIM_IT_Update);
+    TIM_ITConfig(TIM1, TIM_IT_Update, ENABLE);
 }
 
 void Esp8266_Init() {
@@ -314,6 +343,24 @@ void Tim3_Init() {
     TIM_Cmd(TIM3, ENABLE);
 }
 
+__attribute__((unused)) void TIM1_UP_TIM10_IRQHandler() {
+    static int count = 0;
+    if (TIM_GetITStatus(TIM1, TIM_IT_Update) == SET) {
+        if (count >= 1000) {
+            count = 0;
+            TIM_Cmd(TIM1, DISABLE);
+            Beep_Off();
+        } else if (count % 100 == 0) {
+            Beep_Toggle();
+            count++;
+        } else {
+            count++;
+        }
+
+        TIM_ClearITPendingBit(TIM1, TIM_IT_Update);
+    }
+}
+
 __attribute__((unused)) void EXTI4_IRQHandler() {
     if (EXTI_GetITStatus(EXTI_Line4) == SET) {
         for (volatile int i = 0; i < 100; i++) {
@@ -411,6 +458,10 @@ __attribute__((unused)) void TIM4_IRQHandler() {
         Oled_ShowTemperature_24x48(T, (int) TD.count, (int) TD.count);
         printf("Auto temperature: %.2f\n", T);
 
+        if (T >= 37.3) {
+            TIM_Cmd(TIM1, ENABLE);
+        }
+
         TIM_ClearITPendingBit(TIM4, TIM_IT_Update);
         offset = 0;
     }
@@ -480,6 +531,9 @@ __attribute__((unused)) void EXTI0_IRQHandler() {
             offset = 0;
 
             Oled_ShowTemperature_24x48(T, (int) TD.count, (int) TD.count);
+            if (T >= 37.3) {
+                TIM_Cmd(TIM1, ENABLE);
+            }
         }
         EXTI_ClearITPendingBit(EXTI_Line0);
     }
