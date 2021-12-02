@@ -138,7 +138,7 @@ void USART3_IRQHandler(void) {
             Rtc_SetDate(yyyy - 2000, mm, dd, wd);
             Rtc_SetTime(hh, MM, ss);
             bzero(g_esp8266_rx_buf, sizeof(g_esp8266_rx_buf));
-//            esp8266_disconnect_server();
+            esp8266_exit_transparent_transmission();
         }
 
 #if EN_DEBUG_ESP8266

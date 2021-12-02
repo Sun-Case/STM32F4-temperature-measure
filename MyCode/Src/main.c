@@ -43,7 +43,7 @@ int main() {
     Key_Init(KEY_0);
     Key_NVIC_Init(KEY_0, EXTI_Trigger_Rising, 1, 2);
     Key_Init(KEY_1);
-    Key_NVIC_Init(KEY_1, EXTI_Trigger_Rising, 1, 3);
+    Key_NVIC_Init(KEY_1, EXTI_Trigger_Rising_Falling, 1, 3);
     // 初始化 DHT11
     Dht11_Init();
     Tim2_Init();
@@ -78,6 +78,24 @@ int main() {
 }
 
 #pragma clang diagnostic pop
+
+void Sleep() {
+    // 关闭 TIM3 (定时刷新时间)
+    TIM_Cmd(TIM3, DISABLE);
+    // 关闭 TIM4 (定时刷新温湿度)
+    TIM_Cmd(TIM4, DISABLE);
+    // 关闭 TIM5 (定时校准时间)
+    TIM_Cmd(TIM5, DISABLE);
+    // 关闭 OLED
+    Oled_OFF();
+}
+
+void Weak() {
+    Oled_ON();
+    TIM_Cmd(TIM3, ENABLE);
+//    TIM_Cmd(TIM4, ENABLE);
+    TIM_Cmd(TIM5, ENABLE);
+}
 
 void Show_Temperature() {
     if (TD.count == 0) {
@@ -254,7 +272,7 @@ void Tim4_Init() {
 
     TIM_TimeBaseInitTypeDef TIM_TimBaseStruct = {
             .TIM_Prescaler=8400 - 1,
-            .TIM_Period=5000 - 1,
+            .TIM_Period=10000 - 1,
             .TIM_CounterMode=TIM_CounterMode_Up,
             .TIM_ClockDivision=TIM_CKD_DIV1,
     };
@@ -385,7 +403,7 @@ __attribute__((unused)) void TIM2_IRQHandler() {
 }
 
 __attribute__((unused)) void TIM4_IRQHandler() {
-    if (TIM_GetITStatus(TIM3, TIM_IT_Update) == SET) {
+    if (TIM_GetITStatus(TIM4, TIM_IT_Update) == SET) {
         u8 buf[3] = {0};
         Gy906_Read(0x07, buf, 3);
         float T = ((float) *(u16 *) buf) * 0.02 - 273.15; // NOLINT(cppcoreguidelines-narrowing-conversions)
@@ -400,25 +418,49 @@ __attribute__((unused)) void TIM4_IRQHandler() {
 
 __attribute__((unused)) void EXTI2_IRQHandler() {
     static int state = 0;
+    static int is_sleep = 0;
+    static RTC_TimeTypeDef time;
+    static int IN = 0;
 
     if (EXTI_GetITStatus(EXTI_Line2) == SET) {
+        IN = PEin(2);
         for (volatile int i = 0; i < 100; i++) {
             for (volatile int j = 0; j < 100; j++) {}
         }
 
-        if (PEin(2)) {
-            if (state) {
-                TIM_ITConfig(TIM4, TIM_IT_Update, DISABLE);
-                TIM_Cmd(TIM4, DISABLE);
+        if (IN == PEin(2)) {
+            if (!IN) {
+                RTC_GetTime(RTC_Format_BIN, &time);
             } else {
-                TIM_ITConfig(TIM4, TIM_IT_Update, ENABLE);
-                TIM_Cmd(TIM4, ENABLE);
+                RTC_TimeTypeDef t;
+                RTC_GetTime(RTC_Format_BIN, &t);
+                if (t.RTC_Hours > time.RTC_Hours || t.RTC_Minutes > time.RTC_Minutes ||
+                    (t.RTC_Seconds - time.RTC_Seconds >= 2)) {
+                    state = 0;
+                    if (is_sleep) {
+                        printf("Weak\n");
+                        is_sleep = 0;
+                        Weak();
+                    } else {
+                        printf("Sleep\n");
+                        is_sleep = 1;
+                        Sleep();
+                    }
+                } else if (!is_sleep) {
+                    if (state) {
+                        TIM_ITConfig(TIM4, TIM_IT_Update, DISABLE);
+                        TIM_Cmd(TIM4, DISABLE);
+                    } else {
+                        TIM_ITConfig(TIM4, TIM_IT_Update, ENABLE);
+                        TIM_Cmd(TIM4, ENABLE);
+                    }
+                    state = !state;
+                }
             }
-            state = !state;
         }
-
-        EXTI_ClearITPendingBit(EXTI_Line2);
     }
+
+    EXTI_ClearITPendingBit(EXTI_Line2);
 }
 
 __attribute__((unused)) void EXTI0_IRQHandler() {
