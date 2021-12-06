@@ -231,7 +231,7 @@ void Esp8266_Init() {
     printf("esp8266_connect_ap success\n");
     Delay_s(1);
 
-    rt = esp8266_connect_server("TCP", "192.168.5.132", 10086);
+    rt = esp8266_connect_server("TCP", "192.168.8.102", 10086);
     if (rt) {
         printf("esp8266_connect_server fail\n");
         goto Init;
@@ -453,7 +453,7 @@ __attribute__((unused)) void TIM4_IRQHandler() {
     if (TIM_GetITStatus(TIM4, TIM_IT_Update) == SET) {
         u8 buf[3] = {0};
         Gy906_Read(0x07, buf, 3);
-        float T = ((float) *(u16 *) buf) * 0.02 - 273.15; // NOLINT(cppcoreguidelines-narrowing-conversions)
+        float T = ((float) *(u16 *) buf) * 0.02 - 273.15 + 3; // NOLINT(cppcoreguidelines-narrowing-conversions)
 
         Oled_ShowTemperature_24x48(T, (int) TD.count, (int) TD.count);
         printf("Auto temperature: %.2f\n", T);
@@ -522,7 +522,7 @@ __attribute__((unused)) void EXTI0_IRQHandler() {
         if (PAin(0)) {
             u8 buf[3] = {0};
             Gy906_Read(0x07, buf, 3);
-            float T = ((float) *(u16 *) buf) * 0.02 - 273.15; // NOLINT(cppcoreguidelines-narrowing-conversions)
+            float T = ((float) *(u16 *) buf) * 0.02 - 273.15 + 3; // NOLINT(cppcoreguidelines-narrowing-conversions)
 
             printf("Temperature: %.2f\n", T);
 

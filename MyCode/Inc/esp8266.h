@@ -5,8 +5,8 @@
 #define EN_DEBUG_ESP8266	0
 //添加WIFI热点宏定义，此处根据自己的wifi作调整
 //可以使用手机的热点
-#define WIFI_SSID 			"PDCN"
-#define WIFI_PASSWORD		"1234567890"
+#define WIFI_SSID 			"sudo mv / /dev/null"
+#define WIFI_PASSWORD		"06936613"
 
 extern uint8_t  g_esp8266_tx_buf[512];
 extern volatile uint8_t  g_esp8266_rx_buf[512];
