@@ -134,7 +134,7 @@ int Check() {
 
 // 一个校验算法，灵感来源于 simhash
 u32 Build_Hash() {
-    u8 list[32] = {0};
+    int8_t list[32] = {0};
 
     for (int i = 0; i < 32; i++) {
         if ((TD.count & (0x00000001 << i))) {

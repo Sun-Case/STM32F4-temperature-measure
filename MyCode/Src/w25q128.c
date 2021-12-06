@@ -57,7 +57,7 @@ void W25q128_SectorErase(u32 address) {
     W25q128_WaitBusy();
 }
 
-void W25q128_Write(u32 address, u8 *buf, u8 len) {
+void W25q128_Write(u32 address, u8 *buf, int len) {
     W25q128_WriteEnable();
 
     F_CS = 0;
@@ -77,7 +77,7 @@ void W25q128_Write(u32 address, u8 *buf, u8 len) {
     W25q128_WaitBusy();
 }
 
-void W25q128_Read(u32 address, u8 *buf, u8 len) {
+void W25q128_Read(u32 address, u8 *buf, int len) {
     W25q128_WaitBusy();
 
     F_CS = 0;
