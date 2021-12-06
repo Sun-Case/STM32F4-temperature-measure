@@ -136,7 +136,7 @@ int Check() {
 u32 Build_Hash() {
     u8 list[32] = {0};
 
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 32; i++) {
         if ((TD.count & (0x00000001 << i))) {
             list[i]++;
         } else {
@@ -145,7 +145,7 @@ u32 Build_Hash() {
     }
 
     for (int i = 0; i < 32; i++) {
-        for (int j = 0; j < 8; j++) {
+        for (int j = 0; j < 32; j++) {
             if ((*(u32 *) &(TD.T[i])) & (0x00000001 << j)) {
                 list[j]++;
             } else {
